@@ -1,4 +1,7 @@
-fastapi==0.115.5
-uvicorn[standard]==0.32.0
-python-dotenv==1.0.1
-jupyter==1.1.1
+fastapi
+uvicorn
+pandas
+numpy==1.26.4
+scikit-surprise
+scikit-learn
+dill

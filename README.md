@@ -1,40 +1,43 @@
 # Sistema de Recomendação Híbrido de Livros (Goodreads)
 
-Este projeto implementa um sistema de recomendação de livros utilizando um modelo **híbrido em cascata**, combinando **filtragem colaborativa baseada em usuários** e **filtragem baseada em conteúdo**.
+Este projeto implementa um sistema de recomendação de livros utilizando um modelo **híbrido em cascata**, combinando:
 
-A aplicação expõe uma **API em FastAPI**, que pode ser executada tanto em **ambiente local (com ambiente virtual Python 3.11)** quanto em **Docker**.
+- **Filtragem Colaborativa baseada em usuários (CF)**  
+- **Filtragem Baseada em Conteúdo (CB)**, a partir das tags dos livros
+
+A solução é exposta por meio de uma **API em FastAPI**, que pode ser executada em ambiente local (Python 3.11) ou em **Docker**.
 
 ---
 
 ## Objetivo
 
-Desenvolver um sistema capaz de recomendar livros a partir:
+Recomendar livros para um usuário a partir:
 
-- Das avaliações de usuários (notas atribuídas aos livros);
-- Das características de conteúdo dos livros (tags do Goodreads);
-- Da combinação dessas duas abordagens em um modelo híbrido.
+- Do histórico de avaliações (notas) de usuários  
+- Das características de conteúdo (tags do Goodreads)  
+- Da combinação das duas abordagens em um modelo híbrido
 
-Ao final do fluxo de recomendação, o sistema retorna **5 livros recomendados** para um usuário:
+Ao final do fluxo de recomendação, o sistema retorna **5 livros**:
 
-- **2 livros** sugeridos por **filtragem colaborativa (CF)**;
-- **3 livros** sugeridos por **filtragem por conteúdo (CB)**, com base nesses 2 livros iniciais.
+- **2 livros** provenientes da filtragem colaborativa (CF)  
+- **3 livros** provenientes da filtragem por conteúdo (CB), similares aos 2 primeiros
 
 ---
 
 ## Base de Dados
 
-Os dados utilizados foram retirados do conjunto público do **Goodreads** no Kaggle:
+Os dados foram obtidos do conjunto público do **Goodreads** no Kaggle:
 
 > https://www.kaggle.com/code/philippsp/book-recommender-collaborative-filtering-shiny/input
 
 Arquivos utilizados:
 
-- `books.csv` — informações dos livros (ex.: `book_id`, `original_title`, etc.);
-- `ratings.csv` — avaliações dos usuários (`user_id`, `book_id`, `rating`);
-- `tags.csv` — descrição das tags;
-- `book_tags.csv` — associação entre livros e tags.
+- `books.csv` — informações dos livros (`book_id`, `original_title`, etc.)  
+- `ratings.csv` — avaliações dos usuários (`user_id`, `book_id`, `rating`)  
+- `tags.csv` — descrição das tags  
+- `book_tags.csv` — associação entre livros e tags
 
-> **Importante:** estes arquivos devem estar disponíveis no caminho esperado pelo código (por exemplo, na pasta de dados configurada na API / notebook).
+Esses arquivos devem estar disponíveis no caminho esperado pelo código (por exemplo, em uma pasta `data/`).
 
 ---
 
@@ -42,53 +45,54 @@ Arquivos utilizados:
 
 ### 1. Filtragem Colaborativa (CF)
 
-A primeira etapa usa **filtragem colaborativa baseada em usuários** com o algoritmo `KNNBaseline` da biblioteca **Surprise**:
+Implementada com a biblioteca **Surprise** e o algoritmo `KNNBaseline`:
 
-- Leitura das avaliações (`user_id`, `book_id`, `rating`);
-- Criação do `trainset` e treinamento do modelo `KNNBaseline` com similaridade `pearson_baseline`;
-- Para um determinado usuário, o modelo estima as notas dos livros ainda não avaliados;
-- São selecionados os **2 livros com maior nota prevista** como recomendações iniciais.
+- Usa pares (`user_id`, `book_id`, `rating`)  
+- Treina um modelo com similaridade `pearson_baseline`  
+- Para um usuário, estima as notas de livros não avaliados  
+- Seleciona os **2 livros com maior nota prevista** como recomendação inicial
 
 ### 2. Filtragem Baseada em Conteúdo (CB)
 
-A segunda etapa utiliza **filtragem baseada em conteúdo**, a partir das tags dos livros:
+Implementada com **TF-IDF** + **similaridade do cosseno**:
 
-1. As tabelas `tags` e `book_tags` são combinadas para criar, para cada livro, um texto representando suas tags (`all_tags`);
-2. É construída uma matriz **TF-IDF** dessas tags com `TfidfVectorizer`;
-3. A similaridade entre livros é calculada com **similaridade do cosseno** (`cosine_similarity`);
-4. A partir dos 2 livros recomendados pela CF, o sistema procura livros **similares em conteúdo**, excluindo:
-   - Livros já avaliados pelo usuário;
-   - Livros já recomendados pela etapa colaborativa.
+1. Une `tags` e `book_tags`, gerando um texto de tags (`all_tags`) para cada livro  
+2. Cria uma matriz TF-IDF com `TfidfVectorizer`  
+3. Calcula a matriz de similaridade de cosseno entre todos os livros  
+4. A partir dos 2 livros da CF, encontra livros similares em conteúdo, excluindo:  
+   - Livros já avaliados pelo usuário  
+   - Livros já recomendados na etapa colaborativa  
 
-Assim, são escolhidos **3 novos livros** com maior similaridade de conteúdo.
+Seleciona **3 livros** com maior similaridade.
 
 ### 3. Recomendação Híbrida em Cascata
 
-A lógica híbrida combina as duas abordagens:
+Fluxo:
 
-1. A CF escolhe **2 livros “sementes”** com base no histórico do usuário;
-2. A CB encontra **3 livros similares** a esses 2, com base nas tags;
-3. O resultado final é uma lista de **5 livros recomendados** (2 CF + 3 CB).
+1. CF escolhe **2 livros “sementes”** para o usuário  
+2. CB encontra **3 livros similares** a esses 2  
+3. Junta os resultados em uma lista de **5 recomendações** (2 CF + 3 CB)
 
 ---
 
 ## Tecnologias Utilizadas
 
-- **Python 3.11**
-- **FastAPI** — API REST
-- **Uvicorn** — servidor ASGI
-- **pandas**, **numpy**
+- **Python 3.11**  
+- **FastAPI** — API REST  
+- **Uvicorn** — servidor ASGI  
+- **pandas**, **numpy**  
 - **scikit-learn**
   - `TfidfVectorizer`
   - `cosine_similarity`
 - **Surprise**
   - `KNNBaseline`, `Dataset`, `Reader`
-- **dill** (se utilizado para serialização)
+- **dill** (se utilizado para serialização de objetos)  
 - **Docker** (containerização)
 
-> ⚠️ **Observação importante sobre versão de Python / NumPy**  
-> A biblioteca **Surprise** apresenta problemas com algumas combinações de Python e NumPy. Neste projeto, foi padronizado o uso de **Python 3.11** e **NumPy 1.26.4**, que funcionam corretamente com o Surprise.  
-> Por isso é **obrigatório** rodar o projeto em um **ambiente virtual** com Python 3.11 e NumPy travado na versão `1.26.4`.
+⚠️ Observação sobre Python / NumPy  
+O **Surprise** é sensível à combinação de versões de Python e NumPy.  
+Este projeto foi padronizado com **Python 3.11** e **NumPy 1.26.4**, que funcionam corretamente.  
+Por isso é obrigatório rodar em um ambiente virtual com essas versões.
 
 ---
 
@@ -96,25 +100,23 @@ A lógica híbrida combina as duas abordagens:
 
 ### 1. Criar ambiente virtual com Python 3.11
 
-Na raiz do projeto, execute:
+Na raiz do projeto:
 
     python3.11 -m venv .venv311
 
 ### 2. Ativar o ambiente virtual
 
-No **Windows (PowerShell / CMD)**:
+Windows (PowerShell / CMD):
 
     .\.venv311\Scripts\activate
 
-No **Linux / macOS**:
+Linux / macOS:
 
     source .venv311/bin/activate
 
-Você deve ver algo como `(.venv311)` no início da linha de comando após a ativação.
+### 3. Atualizar pip e ajustar NumPy
 
-### 3. Atualizar `pip` e ajustar NumPy
-
-Dentro do ambiente virtual, execute:
+Dentro do ambiente virtual:
 
     pip install --upgrade pip
     pip uninstall -y numpy
@@ -122,54 +124,149 @@ Dentro do ambiente virtual, execute:
 
 ### 4. Instalar as demais dependências
 
-Ainda dentro do ambiente virtual:
-
     pip install -r requirements.txt
-
-> O arquivo `requirements.txt` contém as bibliotecas necessárias para rodar o sistema de recomendação e a API FastAPI.
 
 ### 5. Subir a API com Uvicorn
 
-Na raiz do projeto (ou na pasta onde está o módulo `src.main`), execute:
+Na raiz do projeto (onde o módulo `src.main` está acessível):
 
     uvicorn src.main:app --reload --port 8500
 
-- `src.main:app` → caminho do módulo e nome da instância do FastAPI.  
-- `--reload` → recarrega automaticamente ao salvar mudanças (útil em desenvolvimento).  
-- `--port 8500` → expõe a API na porta 8500.
+A documentação estará disponível em:
 
-Após esse comando, a API ficará disponível em:
-
-- Documentação interativa (Swagger): **http://localhost:8500/docs**
-- Versão alternativa (ReDoc): **http://localhost:8500/redoc** (se habilitada)
+- Swagger UI: http://localhost:8500/docs  
 
 ---
 
 ## Como Executar com Docker
 
-### 1. Construir a imagem Docker
+### 1. Construir a imagem
 
-Na raiz do projeto (onde está o `Dockerfile`), execute:
+Na raiz do projeto (onde está o `Dockerfile`):
 
     docker build -t sistema-recomendacao:latest .
 
-- `-t sistema-recomendacao:latest` → dá o nome e a tag para a imagem.  
-- `.` → indica que o build usa o `Dockerfile` do diretório atual.
-
-### 2. Executar o container
+### 2. Rodar o container
 
     docker run --rm -p 8500:8500 --name sistema-recomendacao sistema-recomendacao:latest
 
-Explicando os parâmetros:
+A API ficará disponível em:
 
-- `--rm` → remove o container automaticamente ao parar;  
-- `-p 8500:8500` → mapeia a porta 8500 do container para a 8500 da máquina host;  
-- `--name sistema-recomendacao` → nome amigável para o container;  
-- `sistema-recomendacao:latest` → imagem criada no passo anterior.
+- http://localhost:8500/docs  
 
-Com o container rodando, a API estará disponível em:
+---
 
-- **http://localhost:8500/docs**
+## Endpoints da API
+
+A seguir, um resumo dos principais endpoints expostos pela API (ver também em `/docs`).
+
+### 1. GET /dataset_health — Dataset Health
+
+- Descrição: verifica se os datasets foram carregados corretamente e retorna informações básicas.  
+- Parâmetros: nenhum.  
+- Uso: monitorar se a API está com dados disponíveis.
+
+Exemplo de resposta:
+
+    {
+      "status": "ok",
+      "books_count": 10000,
+      "ratings_count": 981756,
+      "tags_count": 34250
+    }
+
+---
+
+### 2. POST /recomenda_livro — Recomenda Livro (Colaborativo)
+
+- Descrição: retorna recomendações de livros utilizando apenas filtragem colaborativa para um usuário.  
+- Uso: obter recomendações “puras” de CF.
+
+Body (exemplo):
+
+    {
+      "user_id": 280,
+      "n": 5
+    }
+
+Resposta (exemplo):
+
+    {
+      "user_id": 280,
+      "recomendacoes": [
+        "Livro 1",
+        "Livro 2",
+        "Livro 3",
+        "Livro 4",
+        "Livro 5"
+      ]
+    }
+
+---
+
+### 3. POST /top_n — Top N (Colaborativo)
+
+- Descrição: retorna o Top N de livros recomendados pela filtragem colaborativa para um usuário.  
+
+Body (exemplo):
+
+    {
+      "user_id": 280,
+      "n": 10
+    }
+
+Resposta (exemplo):
+
+    {
+      "user_id": 280,
+      "top_n": [
+        "Livro 1",
+        "Livro 2",
+        "Livro 3"
+      ]
+    }
+
+---
+
+### 4. POST /top_n_hibrida_cascata — Top N Híbrida em Cascata
+
+- Descrição: endpoint principal do sistema, combinando CF + CB.  
+- Funcionamento:
+  - Usa CF para escolher `n_cf` livros iniciais.  
+  - Usa CB para escolher `n_cb` livros similares.  
+  - Retorna lista final híbrida.
+
+Body (exemplo):
+
+    {
+      "user_id": 280,
+      "n_cf": 2,
+      "n_cb": 3
+    }
+
+Resposta (exemplo):
+
+    {
+      "user_id": 280,
+      "cf": [
+        "Livro CF 1",
+        "Livro CF 2"
+      ],
+      "cb": [
+        "Livro CB 1",
+        "Livro CB 2",
+        "Livro CB 3"
+      ],
+      "hibrida": [
+        "Livro CF 1",
+        "Livro CF 2",
+        "Livro CB 1",
+        "Livro CB 2",
+        "Livro CB 3"
+      ]
+    }
+
+Obs.: os nomes exatos dos campos podem variar de acordo com os modelos Pydantic definidos no código. Em caso de dúvida, conferir o schema direto no Swagger em “Schemas”.
 
 ---
 
@@ -177,8 +274,8 @@ Com o container rodando, a API estará disponível em:
 
     .
     ├── src
-    │   ├── main.py                 # Definição da aplicação FastAPI (app)
-    │   ├── recommender.py          # Lógica de recomendação híbrida (CF + CB)
+    │   ├── main.py                 # Definição da aplicação FastAPI (app, rotas)
+    │   ├── recommender.py          # Lógica de recomendação CF, CB e híbrida
     │   └── ...
     ├── data
     │   ├── books.csv
@@ -190,24 +287,16 @@ Com o container rodando, a API estará disponível em:
     ├── README.md
     └── ...
 
-> A estrutura pode variar levemente, mas é importante que o caminho usado em `src.main:app` seja válido e que a API consiga acessar os arquivos de dados conforme configurado no código.
-
 ---
 
-## Próximos Passos (opcionais)
 
-- Adicionar testes automatizados (unitários e/ou de integração) para a API;
-- Criar scripts de inicialização de dados (ex.: pré-processar matrizes TF-IDF e modelos de CF);
-- Configurar logs e monitoramento básico;
-- Publicar a imagem em um registry (por exemplo, Docker Hub).
-
----
 
 ## Referências
 
-- Conjunto de dados do Goodreads (Kaggle)  
-- Documentação das bibliotecas:
-  - FastAPI
-  - Surprise
-  - scikit-learn
-  - NumPy / pandas
+- Dataset Goodreads (Kaggle)  
+- Documentação:
+  - FastAPI — https://fastapi.tiangolo.com/
+  - Surprise — http://surpriselib.com/
+  - scikit-learn — https://scikit-learn.org/
+  - NumPy — https://numpy.org/
+  - pandas — https://pandas.pydata.org/
